@@ -2,9 +2,9 @@
 #include <string>
 
 #ifndef OUTPUT
-#include "include/Threadpool.h"
+#include "include/Threadpool.hpp"
 #else
-#include "Threadpool.h"
+#include "Threadpool.hpp"
 #endif
 
 #define MAXN 10000000000
