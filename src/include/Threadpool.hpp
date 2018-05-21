@@ -27,8 +27,6 @@ class FixedThreadPool
 		template<class F, class ...Arg>
 		auto enqueue(F&& func, Arg&&... args)
 			-> std::future<typename std::result_of<F(Arg...)>::type>;
-
-		[[deprecated]]
 		void barrier();
 		
 	private:
@@ -89,7 +87,8 @@ FixedThreadPool::FixedThreadPool(size_t size)
 							++idle_;
 
 							{
-								
+								std::unique_lock<std::mutex> lock(this->barrier_mutex);
+								this->cond_empty_.notify_all();
 							}
 						}
 					}
