@@ -7,7 +7,7 @@
 #include "Threadpool.hpp"
 #endif
 
-#define MAXN 10000000000
+#define MAXN 1000000000
 size_t consume_some_cpu(size_t N)
 {
 	size_t sum = 0;

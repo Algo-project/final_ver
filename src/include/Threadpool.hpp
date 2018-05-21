@@ -27,19 +27,31 @@ class FixedThreadPool
 		template<class F, class ...Arg>
 		auto enqueue(F&& func, Arg&&... args)
 			-> std::future<typename std::result_of<F(Arg...)>::type>;
+
+		[[deprecated]]
+		void barrier();
 		
 	private:
 		std::vector<std::thread> workers;
 		std::queue<_Func_type> tasks;
 
+		/* the mutex for controlling the task queue */
 		std::mutex task_mutex;
-		std::condition_variable cond;
-		//std::atomic<bool> stop;
+		std::condition_variable cond_notempty_;
+
+
+		size_t threads_;
+		std::atomic<size_t> idle_;
+
+		std::mutex barrier_mutex;
+		std::condition_variable cond_empty_;
+
 		bool stop;
 };
 
 inline 
-FixedThreadPool::FixedThreadPool(size_t size):stop(false)
+FixedThreadPool::FixedThreadPool(size_t size)
+	: threads_(size), idle_(size), stop(false)
 {
 	for(size_t i=0;i<size;i++)
 	{
@@ -50,24 +62,35 @@ FixedThreadPool::FixedThreadPool(size_t size):stop(false)
 						{
 							_Func_type task;	//task to be executed
 
-							/* the thread waits until 'cond' is released by other
+							/* the thread waits until 'cond_notempty_' is released by other
 							 * threads, OR the pool is stopped, OR the pool has 
 							 * some unexecuted task
 							 */
 							{
 								std::unique_lock<std::mutex> lock(this->task_mutex);
-								this->cond.wait(lock,
+
+								/* folling sentense equals to:
+								 * while( !this->stop && this->tasks.empty() )
+								 *		this->cond_notempty_.wait(lock)
+								 */
+								this->cond_notempty_.wait(lock,
 										[this]{return this->stop || !this->tasks.empty();}
 										);
 								if(this->stop && this->tasks.empty())
 									return;
 
 								/* get the task */
+								--idle_;
 								task = std::move(this->tasks.front());
 								this->tasks.pop();
 							}
 
 							task();				//execute the task
+							++idle_;
+
+							{
+								
+							}
 						}
 					}
 				);
@@ -108,8 +131,20 @@ auto FixedThreadPool::enqueue(F&& func, Args&&... args)
 	}
 
 	/* notify the workers */
-	cond.notify_one();
+	cond_notempty_.notify_one();
 	return res;
+}
+
+
+inline void
+FixedThreadPool::barrier()
+{
+	{
+		std::unique_lock<std::mutex> lock(this->barrier_mutex);
+		this->cond_empty_.wait(lock,
+				[this]{return this->idle_.load() == this->threads_;}
+				);
+	}
 }
 
 inline 
@@ -122,7 +157,7 @@ FixedThreadPool::~FixedThreadPool()
 	}
 
 	/* activate all workers */
-	this->cond.notify_all();
+	this->cond_notempty_.notify_all();
 
 	/* wait for close */
 	for(auto & worker : this->workers)
