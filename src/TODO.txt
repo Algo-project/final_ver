@@ -1,0 +1,8 @@
+------------------PENDING-----------------
+complete Operators
+
+
+
+-------------------DONE-------------------
+DONE. add class Database
+DONE. add Catalog into relation

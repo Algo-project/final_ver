@@ -9,7 +9,7 @@
 #include "Threadpool.hpp"
 #endif
 
-#define MAXN 1000000000
+#define MAXN 100
 size_t consume_some_cpu(int tid,size_t N)
 {
     printf("thread %d start to consume some cpu...\n",tid);
@@ -23,6 +23,18 @@ void sleep_job(int tid,int sec)
     printf("thread %d start to sleep for %d seconds\n",tid,sec);
     std::this_thread::sleep_for(std::chrono::seconds(sec));
     printf("thread %d wakes up\n",tid);
+}
+
+class A
+{
+    public:
+        int i;
+        void hello(){std::cout<<i<<std::endl;}
+};
+
+void doA(A &a)
+{
+    a.hello();
 }
 
 int main(int argc, char * argv[])
@@ -39,7 +51,7 @@ int main(int argc, char * argv[])
 
     std::random_device r;
     std::default_random_engine e(r());
-    std::uniform_int_distribution<int> uni(2,6);
+    std::uniform_int_distribution<int> uni(1,2);
 
     for(int i=0;i<nn;i++)
         pool.enqueue(sleep_job,i,uni(e));
@@ -62,6 +74,15 @@ int main(int argc, char * argv[])
     for(auto && result : results)
         std::cout<< result.get() << " ";
     std::cout<<std::endl;
+    pool.barrier();
+
+    /* the example when it comes to object's methods */
+    A a;
+    a.i = 4;
+    pool.enqueue(doA,a);
+    pool.enqueue([&]{
+                a.hello();
+            });
     return 0;
 
 }
