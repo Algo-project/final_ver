@@ -204,11 +204,9 @@ int Filter::Next(std::vector<uint64_t *> *output)
         while( (wr_offset < ROWS_AT_A_TIME)
                         && (this->end_ = child_->Next(&dataIn_)) )
         {
-            filterTimer.Start();
             wr_offset = _doFilter(wr_offset,0);
 
     //}SYN_END(this->mutex);
-            filterTimer.Pause();
         }
     return wr_offset;
 }
@@ -244,12 +242,12 @@ int CheckSum::Next(std::vector<uint64_t *> *output)
     unsigned n;
     while((n = this->child_->Next(&buf)))
     {
-        checkSumTimer.Start();
         auto size = buf.size();
         for(unsigned i = 0;i!=size;++i)
+        {
             this->buffer[i] = std::accumulate(buf[i],buf[i]+n,
                     this->buffer[i]);
-        checkSumTimer.Pause();
+        }
     }
     for(unsigned i=0;i<this->GetColumnCount();i++)
         output->push_back((uint64_t*)(buffer[i]));
@@ -818,138 +816,132 @@ int SelfJoin::Next (std::vector<uint64_t*>* output) {
 
 
 /* Projection Pass */
+Operator* Scan::ProjectionPass (std::map<std::pair<unsigned, unsigned>,unsigned> p_bindings) {
+        std::vector<unsigned> projected;
 
-Operator *Scan::ProjectionPass(ReColMap *binding)
-{
-    std::vector<Id_t> proj;
-    for(unsigned i = 0;i<this->bindings.size();i++)
-        if(binding->count(this->bindings[i]))
-            proj.push_back(i);
-    return new Projection(this, proj);
+        for (unsigned i = 0; i < bindings.size(); i++)
+            if (p_bindings.find(bindings[i]) != p_bindings.end())
+                projected.push_back(i);
+
+        //if we deallocate tree nodes we might want to check double frees
+        return new Projection (this, projected);
 }
 
-Operator *Projection::ProjectionPass(ReColMap *binding)
-{
-    ReColMap p_bindings = *binding;
-    /* pass (my projection) AND (binding) to child */
-    for(unsigned i=0;i<this->bindings.size();i++)
-        p_bindings[bindings[i]] = 0;
-    Operator *newChild = this->child_->ProjectionPass(&p_bindings);
+Operator* Projection::ProjectionPass (std::map<std::pair<unsigned, unsigned>,unsigned> p_bindings) {
+        for (unsigned i = 0; i < bindings.size(); i++)
+            p_bindings[bindings[i]] = 0;
 
-    /* apply binding on newChild */
-    auto &c_bindings = newChild->GetBindings();
-    std::vector<Id_t> proj;
-    for(auto &bd : this->bindings)
-        for(int j=0;j<c_bindings.size();j++)
-            if(bd == c_bindings[j])
-            {
-                proj.push_back(j);
-                break;
+        Operator* newchild = child_->ProjectionPass(p_bindings);
+
+        std::vector<std::pair<unsigned, unsigned> >& c_bindings = newchild->GetBindings();
+
+        std::vector<unsigned> new_selected;
+
+        for (unsigned i = 0; i < bindings.size(); i++)
+            for (unsigned j = 0; j < c_bindings.size(); j++)
+                if (bindings[i] == c_bindings[j]) {
+                    new_selected.push_back(j);
+                    break;
+                }
+
+        return new Projection(newchild, new_selected);
+}
+
+Operator* CheckSum::ProjectionPass (std::map<std::pair<unsigned, unsigned>,unsigned> p_bindings) {
+        return new CheckSum (child_->ProjectionPass(p_bindings));
+}
+
+Operator* HashJoin::ProjectionPass (std::map<std::pair<unsigned, unsigned>,unsigned> p_bindings) {
+        std::map<std::pair<unsigned, unsigned>,unsigned> pushed_bindings = p_bindings;
+        pushed_bindings[bindings[jright]] = 0;
+        pushed_bindings[bindings[cright+jleft]] = 0;
+
+        Operator* newleft = left->ProjectionPass(pushed_bindings);
+        Operator* newright = right->ProjectionPass(pushed_bindings);
+
+        std::vector<unsigned> selected;
+
+        uint32_t njleft = -1;
+        uint32_t njright = -1;
+
+        for (unsigned i = 0; i < (newleft->GetBindings()).size(); i++)
+            if ((newleft->GetBindings())[i] == bindings[cright + jleft]) {
+                njleft = i;
             }
 
-    return new Projection(newChild, proj);
+        for (unsigned i = 0; i < (newright->GetBindings()).size(); i++)
+            if ((newright->GetBindings())[i] == bindings[jright]) {
+                njright = i;
+            }
+
+        Operator* newjoin = new HashJoin (newleft, newleft->GetColumnCount(), njleft, 
+                    newright, newright->GetColumnCount(), njright,
+                    htSize);
+
+        ((HashJoin*)newjoin)->Configure (log_parts1, log_parts2, first_bit, NULL, NULL, NULL, NULL);
+
+        for (unsigned i = 0; i < (newjoin->GetBindings()).size(); i++)
+            if (p_bindings.find((newjoin->GetBindings())[i]) != p_bindings.end())       
+                selected.push_back(i);
+
+        return new Projection(newjoin, selected);
 }
 
-Operator *Filter::ProjectionPass(ReColMap *binding)
-{
-    auto p_bindings = *binding;
-    auto pushed_bindings = p_bindings;
-    auto pred = filter_.filterColumn.colId;
-    pushed_bindings[bindings[pred]] = 0;
+Operator* Filter::ProjectionPass (std::map<std::pair<unsigned, unsigned>,unsigned> p_bindings) {
+        auto pred = this->filter_.filterColumn.colId;
+        std::map<std::pair<unsigned, unsigned>,unsigned> pushed_bindings = p_bindings;
+        pushed_bindings[bindings[pred]] = 0;
 
-    Operator* newchild = child_->ProjectionPass(&pushed_bindings);
+        Operator* newchild = child_->ProjectionPass(pushed_bindings);
 
-    std::vector<unsigned> selected;
+        std::vector<unsigned> selected;
 
-    uint32_t npred = -1;
+        uint32_t npred = -1;
 
-    for (unsigned i = 0; i < (newchild->GetBindings()).size(); i++)
-        if ((newchild->GetBindings())[i] == bindings[pred]) {
-            npred = i;
-        }
+        for (unsigned i = 0; i < (newchild->GetBindings()).size(); i++)
+            if ((newchild->GetBindings())[i] == bindings[pred]) {
+                npred = i;
+            }
 
-    Operator* newselect = new Filter(newchild, this->filter_, newchild->GetColumnCount());
+        FilterInfo f = this->filter_;
+        f.filterColumn.colId = npred;
+        Operator* newselect = new Filter(newchild, f/*this->filter_*/, newchild->GetColumnCount());
 
-    for (unsigned i = 0; i < (newselect->GetBindings()).size(); i++)
-        if (p_bindings.find((newselect->GetBindings())[i]) != p_bindings.end())       
-            selected.push_back(i);
+        for (unsigned i = 0; i < (newselect->GetBindings()).size(); i++)
+            if (p_bindings.find((newselect->GetBindings())[i]) != p_bindings.end())       
+                selected.push_back(i);
 
-    return new Projection(newselect, selected);
+        return new Projection(newselect, selected);
 }
 
-Operator *CheckSum::ProjectionPass(ReColMap *binding)
-{
-    return new CheckSum(this->child_->ProjectionPass(binding));
-}
+Operator* SelfJoin::ProjectionPass (std::map<std::pair<unsigned, unsigned>, unsigned> p_bindings) {
+        std::map<std::pair<unsigned, unsigned>,unsigned> pushed_bindings = p_bindings;
+        pushed_bindings[bindings[col1]] = 0;
+        pushed_bindings[bindings[col2]] = 0;
 
-Operator *HashJoin::ProjectionPass(ReColMap *binding)
-{
-    auto p_bindings = *binding;
-    auto pushed_bindings = p_bindings;
-    pushed_bindings[bindings[jright]] = 0;
-    pushed_bindings[bindings[cright+jleft]] = 0;
+        Operator* newchild = child->ProjectionPass(pushed_bindings);
 
-    Operator* newleft = left->ProjectionPass(&pushed_bindings);
-    Operator* newright = right->ProjectionPass(&pushed_bindings);
+        std::vector<unsigned> selected;
 
-    std::vector<unsigned> selected;
+        uint32_t npred1 = -1;
 
-    uint32_t njleft = -1;
-    uint32_t njright = -1;
+        for (unsigned i = 0; i < (newchild->GetBindings()).size(); i++)
+            if ((newchild->GetBindings())[i] == bindings[col1]) {
+                npred1 = i;
+            }
 
-    for (unsigned i = 0; i < (newleft->GetBindings()).size(); i++)
-        if ((newleft->GetBindings())[i] == bindings[cright + jleft]) {
-            njleft = i;
-        }
+        uint32_t npred2 = -1;
 
-    for (unsigned i = 0; i < (newright->GetBindings()).size(); i++)
-        if ((newright->GetBindings())[i] == bindings[jright]) {
-            njright = i;
-        }
+        for (unsigned i = 0; i < (newchild->GetBindings()).size(); i++)
+            if ((newchild->GetBindings())[i] == bindings[col2]) {
+                npred2 = i;
+            }
 
-    Operator* newjoin = new HashJoin (newleft, newleft->GetColumnCount(), njleft, 
-            newright, newright->GetColumnCount(), njright,
-            htSize);
+        Operator* newselect = new SelfJoin (newchild, npred1, npred2, newchild->GetColumnCount());
 
-    ((HashJoin*)(newjoin))->Configure (log_parts1, log_parts2, first_bit, NULL, NULL, NULL, NULL);
+        for (unsigned i = 0; i < (newselect->GetBindings()).size(); i++)
+            if (p_bindings.find((newselect->GetBindings())[i]) != p_bindings.end())       
+                selected.push_back(i);
 
-    for (unsigned i = 0; i < (newjoin->GetBindings()).size(); i++)
-        if (p_bindings.find((newjoin->GetBindings())[i]) != p_bindings.end())       
-            selected.push_back(i);
-
-    return new Projection(newjoin, selected);
-}
-
-Operator *SelfJoin::ProjectionPass(ReColMap *binding)
-{
-    auto p_bindings = *binding;
-    auto pushed_bindings = p_bindings;
-    pushed_bindings[bindings[col1]] = 0;
-    pushed_bindings[bindings[col2]] = 0;
-
-    Operator* newchild = child->ProjectionPass(&pushed_bindings);
-
-    std::vector<unsigned> selected;
-
-    uint32_t npred1 = -1;
-
-    for (unsigned i = 0; i < (newchild->GetBindings()).size(); i++)
-        if ((newchild->GetBindings())[i] == bindings[col1]) {
-            npred1 = i;
-        }
-
-    uint32_t npred2 = -1;
-
-    for (unsigned i = 0; i < (newchild->GetBindings()).size(); i++)
-        if ((newchild->GetBindings())[i] == bindings[col2]) {
-            npred2 = i;
-        }
-
-    Operator* newselect = new SelfJoin (newchild, npred1, npred2, newchild->GetColumnCount());
-
-    for (unsigned i = 0; i < (newselect->GetBindings()).size(); i++)
-        if (p_bindings.find((newselect->GetBindings())[i]) != p_bindings.end())       
-            selected.push_back(i);
-
-    return new Projection(newselect, selected);
+        return new Projection(newselect, selected);
 }

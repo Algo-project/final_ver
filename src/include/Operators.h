@@ -69,7 +69,7 @@ class Operator
         virtual size_t GetMaxRows() const = 0;    /* the max rows on the next return of Next() */
         ReColList &GetBindings() { return this->bindings;}
         
-        virtual Operator *ProjectionPass(ReColMap *pbindings) = 0;
+        virtual Operator *ProjectionPass(ReColMap pbindings) = 0;
 
     protected:
         ReColList bindings;
@@ -101,7 +101,7 @@ class Scan : public Operator
         virtual size_t GetColumnCount() const override {return num_cols_;}
         virtual size_t GetMaxRows() const override {return Operator::ROWS_AT_A_TIME;}
 
-        virtual Operator *ProjectionPass(ReColMap *pbindings) override;
+        virtual Operator *ProjectionPass(ReColMap pbindings) override;
 
         
     protected:
@@ -130,9 +130,9 @@ class Projection : public Operator
         virtual int Next(std::vector<uint64_t*> *v) override;
         virtual int Close() override;
 
-        size_t GetColumnCount() const override {return child_->GetColumnCount();}
+        size_t GetColumnCount() const override {return this->selected_cols_.size();}
         size_t GetMaxRows() const override {return child_->GetMaxRows();}
-        virtual Operator *ProjectionPass(ReColMap *pbindings) override;
+        virtual Operator *ProjectionPass(ReColMap pbindings) override;
 
     protected:
         Operator *child_;
@@ -161,12 +161,12 @@ class Filter : public Operator
         
         virtual size_t GetColumnCount() const override {return num_cols_;}
         virtual size_t GetMaxRows() const override {return Operator::ROWS_AT_A_TIME;}
-        virtual Operator *ProjectionPass(ReColMap *pbindings) override;
+        virtual Operator *ProjectionPass(ReColMap pbindings) override;
 
     protected:
         Operator *child_;
     private:
-        const FilterInfo &filter_;
+        const FilterInfo filter_;
 
         unsigned offset_;
         unsigned end_;
@@ -201,7 +201,7 @@ class CheckSum: public Operator
         virtual size_t GetColumnCount() const override {return child_->GetColumnCount();}
         virtual size_t GetMaxRows() const override {return 1;}
 
-        virtual Operator *ProjectionPass(ReColMap *pbindings) override;
+        virtual Operator *ProjectionPass(ReColMap pbindings) override;
 
     private:
         Operator *child_;
@@ -291,7 +291,7 @@ class HashJoin : public Operator
         virtual size_t GetColumnCount() const override {return cleft+cright;}
         virtual size_t GetMaxRows() const override {return ROWS_AT_A_TIME;}
 
-        virtual Operator *ProjectionPass(ReColMap *pbindings) override;
+        virtual Operator *ProjectionPass(ReColMap pbindings) override;
     private:
         /* Hash Partitioners */
         /* Use 'two pass' partition */
@@ -382,7 +382,7 @@ class SelfJoin : public Operator {
 
     int Close () override;
 
-    Operator *ProjectionPass(ReColMap*) override;
+    Operator *ProjectionPass(ReColMap) override;
 
 
 

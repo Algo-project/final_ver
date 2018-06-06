@@ -3,18 +3,20 @@
 #include <string>
 #include <omp.h>
 #include <thread>
-#ifndef OUTPUT
+#ifndef OUTPUT 
     #include "include/Threadpool.hpp"
     #include "include/Database.h"
     #include "include/Relation.h"
     #include "include/Operators.h"
     #include "include/Timer.hpp"
+    #include "include/Joiner.h"
 #else
     #include "Threadpool.hpp"
     #include "Database.h"
     #include "Relation.h"
     #include "Operators.h"
     #include "Timer.hpp"
+    #include "Joiner.h"
 #endif
 
 Util::Timer checkSumTimer;
@@ -37,7 +39,7 @@ int main(int argc,char *argv[])
     std::cerr<<"Crossed the barrier!"<<std::endl;
 
 
-
+/*
     Util::Timer timer;
     timer.Start();
     
@@ -65,5 +67,16 @@ int main(int argc,char *argv[])
     std::cout<<"Filter: "<<filterTimer.GetTime()<<" "<<filterTimer.GetStartCount()<<std::endl;
     std::cout<<"CheckSum: "<<checkSumTimer.GetTime()<<" "<<checkSumTimer.GetStartCount()<<std::endl;
     std::cout<<"finished!"<<std::endl;
+    */
+    QueryInfo q,q2;
+    while(std::getline(std::cin,line))
+    {
+        if(line=="F")
+            continue;
+        q.parseQuery(line);
+        q2.rewriteQuery(q);
+        Joiner j(&db);
+        std::cout<<j.join(std::move(q2))<<std::endl;
+    }
     return 0;
 }

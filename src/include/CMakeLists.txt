@@ -5,6 +5,7 @@ SET(DATABASE_SOURCE
             Relation.h Relation.cpp
             Operators.h Operators.cpp         
             HashTable.hpp
+            Joiner.h Joiner.cpp
             Timer.hpp
     )
 ADD_LIBRARY(threadpool STATIC ${THREAD_SOURCE})

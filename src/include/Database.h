@@ -28,6 +28,11 @@ class Database
             return relations[relationID];
         }
 
+        size_t Size() const
+        {
+            return relations.size();
+        }
+
         Database() = default;
         ~Database() { for(auto r:relations) delete r;}
 };
