@@ -22,6 +22,7 @@ class FixedThreadPool
 {
     public:
         FixedThreadPool(size_t size);
+    public:
         ~FixedThreadPool();
 
         template<class F, class ...Arg>
@@ -45,6 +46,9 @@ class FixedThreadPool
         std::condition_variable cond_empty_;
 
         bool stop;
+
+    public:
+        static FixedThreadPool *GlobalPool;
 };
 
 inline 

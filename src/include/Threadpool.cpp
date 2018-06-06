@@ -1,3 +1,4 @@
 #include "Threadpool.hpp"
 
-/* NOTHING HERE */
+Aposta::FixedThreadPool *Aposta::FixedThreadPool::GlobalPool
+    = new Aposta::FixedThreadPool(std::thread::hardware_concurrency() - 1);

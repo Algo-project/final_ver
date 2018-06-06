@@ -49,7 +49,7 @@ Relation::Relation(const char *filename) : relation_id_(Relation::next_id_++) {
         ptr += this->num_rows();
     }
 
-    catalog_ = new uint64_t[this->num_rows()*3];
+    catalog_ = new uint64_t[this->num_cols()*3];
 }
 
 Relation::Relation(uint64_t **data, int columns, int rows)

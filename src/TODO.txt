@@ -1,8 +1,16 @@
+-----------------POTENTIAL----------------
+parallel Filter::_doFilter
+parallel CheckSum::Next
+CHT
+
+
 ------------------PENDING-----------------
-complete Operators
+All ProjectionPass is buggy (parameter should be ReColMap instead of ReColMap*)
 
 
 
 -------------------DONE-------------------
 DONE. add class Database
 DONE. add Catalog into relation
+DONE. simple HashTable
+DONE. complete Operators
