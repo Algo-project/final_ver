@@ -1,9 +1,8 @@
-MAKE_JOINER=OFF
+MAKE_JOINER=ON
 MAKE_TEST=ON
-BUILD_TYPE=debug
+BUILD_TYPE=Release
 
-rm -rf build
-mkdir build
+mkdir -p build
 cd build
 cmake -DMAKE_JOINER=$MAKE_JOINER\
    	-DMAKE_TEST=$MAKE_TEST\
@@ -11,4 +10,3 @@ cmake -DMAKE_JOINER=$MAKE_JOINER\
 	../src/
 make install
 cd ..
-rm -rf build

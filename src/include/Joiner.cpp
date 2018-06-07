@@ -12,6 +12,7 @@ static void configure_hashjoin(Relation *r, SelectInfo &sel, int ptsize,
 static int analyze_input_join(IdSet& usedRelations,
         SelectInfo& leftInfo,SelectInfo& rightInfo);
 static void column_update(SelPosMap& mapper,unsigned partner_size);
+static unsigned vector_index(IdList &vec, unsigned element);
 
 struct JoinInput
 {
@@ -48,18 +49,16 @@ struct JoinInput
 
 /* Class Joiner */
 
-Joiner::Joiner(Database *db):relations_(&(db->relations))
+Joiner::Joiner(const Database *db):relations_(&(db->relations))
 {
     auto size = db->Size();
-    catalog_ = new uint64_t *[size];
     for(size_t i=0;i<size;i++)
-        catalog_[i] = db->relations[i]->GetCatalog();
+        catalog_.push_back(db->relations[i]->GetCatalog());
 }
 
 Joiner::~Joiner()
 {
     /* do NOT delete catalog_[i] */
-    delete[] catalog_;
 }
 
 Operator *Joiner::_addScan(IdSet &used_relations,
@@ -100,20 +99,45 @@ std::string Joiner::join1(QueryInfo &&info)
     SelPosMap mapper;
     Operator *root;
     PredicateInfo &first_join = info.predicates[0];
+    std::vector<unsigned> return_needed;
+
+    uint32_t cleft, cright;
+    uint32_t left_proj_colId,right_proj_colId;
+    Operator *push_fil_l, *push_fil_r;
 
     Operator *left = _addScan(used_rel, first_join.left, info);
     Operator *right = _addScan(used_rel, first_join.right, info);
 
-    JoinInput leftInput{left}, rightInput{right};
-    leftInput.Configure(mapper, first_join.left, info, 0);
+    /* Init left */
+    {
+        auto &sel = first_join.left;
+        for(unsigned i=0;i<left->GetColumnCount();i++)
+            return_needed.push_back(i);
+        mapper_insert(mapper, sel.binding, return_needed, 0);
+        push_fil_l = _addFilter(sel.binding, left, info);
+        cleft = return_needed.size();
+        left_proj_colId = vector_index(return_needed, sel.colId);
+        return_needed.clear();
+    }
 
-    column_update(mapper, right->GetColumnCount());
-    rightInput.Configure(mapper, first_join.right, info, 0);
+    /* Init right */
+    {
+        auto &sel = first_join.right;
+        for(unsigned i=0;i<right->GetColumnCount();i++)
+            return_needed.push_back(i);
+        cright = return_needed.size();
+        right_proj_colId = vector_index(return_needed, sel.colId);
+        push_fil_r = _addFilter(sel.binding, right, info);
+        column_update(mapper, cright);
+        mapper_insert(mapper, sel.binding, return_needed, 0);
+        return_needed.clear();
+    }
 
-    root = new HashJoin(leftInput.input, leftInput.cols, leftInput.selCol,
-            rightInput.input, rightInput.cols, rightInput.selCol,
+
+    root = new HashJoin(push_fil_l, cleft, left_proj_colId,
+            push_fil_r, cright, right_proj_colId,
             HTSIZE);
-    std::cout<<"rightsel: "<<rightInput.selCol<<std::endl;
+
     Relation *r = (*relations_)[first_join.right.relId];
     configure_hashjoin(r, first_join.right, HTSIZE, (HashJoin*)root);
 
@@ -124,42 +148,47 @@ std::string Joiner::join1(QueryInfo &&info)
                    &right_info = pinfo.right;
         Operator *left, *right, *center;
         auto situation = analyze_input_join(used_rel,left_info,right_info);
-        std::cerr<<"Join: "<<pinfo.dumpSQL()<<std::endl<<"Used Rel:";
-        for(auto v:used_rel)
-            std::cerr<<v<<" ";
-        std::cerr<<std::endl;
         if(situation == 0)      /* left already used */
         {
-            std::cerr<<"Situation left used!"<<std::endl;
             left = std::move(root);
+            /* Init right */
             right = _addScan(used_rel, right_info, info);
-            rightInput = JoinInput(right);
-            column_update(mapper, right->GetColumnCount());
-            rightInput.Configure(mapper, right_info, info, 0);
+            for(unsigned i = 0;i<right->GetColumnCount();i++)
+                return_needed.push_back(i);
+            cright = return_needed.size();
+            right_proj_colId = vector_index(return_needed, right_info.colId);
+            push_fil_r = _addFilter(right_info.binding, right, info);
+
             root = new HashJoin(left, left->GetColumnCount(), mapper[left_info.binding][left_info.colId],
-                    rightInput.input, rightInput.cols, rightInput.selCol,
+                    std::move(push_fil_r), cright, right_proj_colId,
                     HTSIZE);
 
-            std::cout<<"rightsel: "<<rightInput.selCol<<std::endl;
+            column_update(mapper, right->GetColumnCount());
+            mapper_insert(mapper, right_info.binding, return_needed, 0);
+
             Relation *r = (*relations_)[right_info.relId];
             configure_hashjoin(r, right_info, HTSIZE, (HashJoin*)root);
+            return_needed.clear();
         }
         else if(situation == 1) /* right already used */
         {
-            std::cerr<<"Situation right used!"<<std::endl;
             left = _addScan(used_rel, left_info, info);
             right = std::move(root);
-            //column_update(mapper, left->GetColumnCount());
-//            std::cout<<"column update "<<left->GetColumnCount()<<std::endl;
-            leftInput.Configure(mapper, left_info, info, right->GetColumnCount());
 
-            root = new HashJoin(leftInput.input, leftInput.cols, leftInput.selCol,
+            /* Init Left */
+            for(unsigned i=0;i<left->GetColumnCount();i++)
+                return_needed.push_back(i);
+            cleft = return_needed.size();
+            push_fil_l = _addFilter(left_info.binding, left, info);
+            mapper_insert(mapper, left_info.binding, return_needed, right->GetColumnCount());
+            left_proj_colId = vector_index(return_needed, left_info.colId);
+            root = new HashJoin(std::move(push_fil_l), cleft, left_proj_colId,
                     std::move(right), right->GetColumnCount(), mapper[right_info.binding][right_info.colId],
                     HTSIZE);
-            std::cout<<"rightsel: "<<mapper[right_info.binding][right_info.colId]<<std::endl;
 
             Relation *r = (*relations_)[left_info.relId];
             configure_hashjoin(r, left_info, HTSIZE, (HashJoin*)root);
+            return_needed.clear();
         }
         else if(situation == 2) /* self join */
         {
@@ -167,7 +196,6 @@ std::string Joiner::join1(QueryInfo &&info)
             auto c1 = mapper[left_info.binding][left_info.colId],
                  c2 = mapper[right_info.binding][right_info.colId];
             root = new SelfJoin(std::move(center), c1, c2, center->GetColumnCount());
-            std::cerr<<"Situation Self!"<<std::endl;
         }
         else    /* delay the join */
         {
@@ -191,14 +219,14 @@ std::string Joiner::join1(QueryInfo &&info)
 
 
     std::stringstream out;
-    for(unsigned i=0;i<info.selections.size();i++)
+    for(unsigned i=0;i<info.results.size();i++)
     {
-        uint64_t res = (uint64_t)results[i];
+        uint64_t res = (uint64_t)results[info.results[i]];
         if(res)
             out<<std::to_string(res);
         else
-            out<<"NULL : "<<res;
-        if(i!=info.selections.size()-1) out<<" ";
+            out<<"NULL";
+        if(i!=info.results.size()-1) out<<" ";
     }
 
 
@@ -222,7 +250,7 @@ static void mapper_insert(SelPosMap &mapper, Id_t relId, IdList &seled_col,
 static void configure_hashjoin(Relation *r, SelectInfo &sel, int ptsize, HashJoin *root)
 {
     int numrows = r->num_rows();
-    int maxval = r->GetCatalog()[sel.colId * 3 + 2];
+    uint64_t maxval = r->GetCatalog()[sel.colId * 3 + 2];
     int partsize = ptsize;
     int numparts = numrows / partsize;
     if(numparts < 128) numparts = 128;
@@ -341,7 +369,10 @@ std::string Joiner::join(QueryInfo&& qinfo){
     /* configure first join */
 	{
 	int numrows = catalog_[first_join.right.relId][0];
-	int maxval = catalog_[first_join.right.relId][2+(first_join.right.colId*3)+2];
+	uint64_t maxval = catalog_[first_join.right.relId][2+(first_join.right.colId*3)+2];
+
+    fprintf(stderr,"maxval: %zu, numrows: %d, test: %zu\n",
+            maxval, numrows, catalog_[first_join.right.relId][2]);
 
 	int partsize = 1 << 10;
 	int numparts = numrows / partsize;

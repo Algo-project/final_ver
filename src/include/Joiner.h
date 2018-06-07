@@ -1,6 +1,7 @@
 #ifndef _JOINER_HH_
 #define _JOINER_HH_
 
+#include <unordered_map>
 #include "Relation.h"
 #include "parser.h"
 #include "Database.h"
@@ -24,16 +25,16 @@ class Joiner
         static Operator *_addFilter(Id_t sel_binding, 
                 Operator *child, QueryInfo &qinfo);
     public:
-        Joiner(Database *db);
+        Joiner(const Database *db);
         ~Joiner();
 
         std::string join(QueryInfo &&info);
         std::string join1(QueryInfo &&info);
 
     private:
-        uint64_t **catalog_;
+        std::vector<const uint64_t*> catalog_;
     public:
-        std::vector<Relation *> *relations_;
+        const std::vector<Relation *> *relations_;
 };
 
 

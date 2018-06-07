@@ -19,9 +19,13 @@
     #include "Joiner.h"
 #endif
 
+Util::Timer hashJoinTimer;
+Util::Timer hashTableTimer;
 Util::Timer checkSumTimer;
 Util::Timer filterTimer;
+Util::Timer partitionTimer;
 using ThreadPool = Aposta::FixedThreadPool;
+static std::string doJob(std::string line,const Database *db);
 int main(int argc,char *argv[])
 {
     ThreadPool *pool = Aposta::FixedThreadPool::GlobalPool;
@@ -31,9 +35,9 @@ int main(int argc,char *argv[])
     {
         if(line == "Done") break;
         db.AddRelation(line.c_str());
-        pool->enqueue([&db]{
-                    db.relations.back()->InitCatalog();
-                });
+        pool->enqueue([](Relation *r){
+                    r->InitCatalog();
+                },db.relations.back());
     }
     pool->barrier();
     std::cerr<<"Crossed the barrier!"<<std::endl;
@@ -69,14 +73,33 @@ int main(int argc,char *argv[])
     std::cout<<"finished!"<<std::endl;
     */
     QueryInfo q,q2;
+    std::vector<std::future<std::string>> results;
     while(std::getline(std::cin,line))
     {
         if(line=="F")
+        {
+            for(auto &&fut : results)
+                std::cout<<fut.get()<<std::endl;
+            results.clear();
             continue;
-        q.parseQuery(line);
-        q2.rewriteQuery(q);
-        Joiner j(&db);
-        std::cout<<j.join(std::move(q2))<<std::endl;
+        }
+        auto fut = pool->enqueue(doJob,line,&db);
+        results.push_back(std::move(fut));
+//        std::cout<<doJob(line,&db)<<std::endl;
     }
+
+    std::cout<<"Partition Time: "<<partitionTimer.GetTime()<<" "<<partitionTimer.GetStartCount()<<std::endl;
+    std::cout<<"HashJoin Time: "<<hashJoinTimer.GetTime()<<" "<<hashJoinTimer.GetStartCount()<<std::endl;
+    std::cout<<"HashTable Time: "<<hashTableTimer.GetTime()<<" "<<hashTableTimer.GetStartCount()<<std::endl;
     return 0;
+}
+
+static std::string doJob(std::string line,const Database *db)
+{
+    QueryInfo q1,q2;
+    q1.clear();q2.clear();
+    q1.parseQuery(line);
+    q2.rewriteQuery(q1);
+    Joiner j(db);
+    return j.join1(std::move(q2));
 }

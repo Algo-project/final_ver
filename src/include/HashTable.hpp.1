@@ -1,20 +1,48 @@
-#ifndef HASH_TABLE_H
-#define HASH_TABLE_H
+#ifndef _HASHTABLE_HPP_
+#define _HASHTABLE_HPP_
 
-#include <iostream>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
+#include <unordered_map>
+#include <map>
+#include <algorithm>
 #include <vector>
+#include <string.h>
+#include "Timer.hpp"
 
-const unsigned int kAllocInit = 10000;  // Initial allocator capacity
 
-// Array-based hash table
-// Initialised with number of buckets
-// Example use:
-// HashTable<int> ht(size);
-// ht.insert(key,value,key%size);
-// value = ht.SearchKey(key,key%size);
+/* A simple hashtable based on std::unordered_multimap */
+
+extern Util::Timer hashTableTimer;
+template<typename E>
+class SimpleHashTable
+{
+    public:
+        SimpleHashTable(size_t s){};
+        ~SimpleHashTable() = default;
+
+        size_t GetSize()const {return table_.size();}
+        void Insert(const uint64_t key, const uint64_t hashv, const uint64_t v)
+        {
+            table_.insert({key,v});
+        }
+        int SearchKey(const uint64_t key, const uint64_t hashv, std::vector<uint64_t> &result) const
+        {
+            auto pair = table_.equal_range(key);
+            std::transform(pair.first, pair.second, std::back_inserter(result),
+                    [](auto it){return it.second;});
+            return std::distance(pair.first, pair.second);
+        }
+        void Erase(){
+            table_.clear();
+        }
+    private:
+        std::multimap<E,uint64_t> table_;
+
+};
+
+
+
+/* HashTable Definition */
+/*const unsigned int kAllocInit = 10000;  // Initial allocator capacity
 template <typename E>
 class HashTable
 {
@@ -49,7 +77,6 @@ public:
 		allocator_[offset].value = value;
 
 		buckets_[hash_value] = offset;
-        //fprintf(stderr,"size : %zu\n", this->allocator_size_);
 	};
 	
 	// Return value associated with key + its hash value else NULL
@@ -149,7 +176,8 @@ private:
 
 	size_t size_;
 	uint64_t *buckets_;	// Heads of hash entry lists (offsets of allocator_ array)
-};
-
+};*/
+template<typename E>
+using HashTable = SimpleHashTable<E>;
 
 #endif

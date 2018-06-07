@@ -28,8 +28,10 @@
 */
 
 
+extern Util::Timer hashJoinTimer;
 extern Util::Timer checkSumTimer;
 extern Util::Timer filterTimer;
+extern Util::Timer partitionTimer;
 using Id_t = unsigned;
 using ReColPair = std::pair<Id_t,Id_t>;
 using ReColList = std::vector<ReColPair>;
@@ -191,7 +193,7 @@ class CheckSum: public Operator
         static constexpr int POOL_SIZE = 1;
     public:
         CheckSum(Operator *child);
-        ~CheckSum(){delete[]buffer;}
+        ~CheckSum(){}
         
         /* Standard Interface */
         virtual int Open() override;

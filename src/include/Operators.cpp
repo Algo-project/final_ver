@@ -229,6 +229,7 @@ int CheckSum::Open()
 
 int CheckSum::Close()
 {
+    delete[] this->buffer;
     child_->Close();
     return 0;
 }
@@ -356,6 +357,7 @@ void HashPartitioner::Generate (Operator* input) {
     std::vector<uint64_t*> vec;
 
     while ((end = input->Next(&vec))) {
+//        partitionTimer.Start();
         /*
         assign each element of the vector to its partition
         */
@@ -369,7 +371,7 @@ void HashPartitioner::Generate (Operator* input) {
                 */
                 /*
                 uint32_t coffset = (cache_offset[partition])++;
-                cache[coffset] = key;
+                cache[coffset][pfield] = key;
 
                 if ((coffset & ((1 << LOG_BATCH_SIZE) - 1)) == ((1 << LOG_BATCH_SIZE) - 1)) {
                     for (int k = 0; k < (1 << (LOG_BATCH_SIZE - 3)); k++) {
@@ -405,6 +407,7 @@ void HashPartitioner::Generate (Operator* input) {
                 partitioned_data[partition][j][off] = vec[j][i];
             }
         }
+//        partitionTimer.Pause();
     }
 
     /*
@@ -424,6 +427,7 @@ void HashPartitioner::Generate (Operator* input) {
 
 /*same as the other ones but used existing partitions as input*/
 void HashPartitioner::Generate (HashPartitioner& h_first) {
+//    partitionTimer.Start();
     const uint32_t parts = (1 << (log_parts - h_first.log_parts));
     const uint32_t parts_mask = parts - 1;
 
@@ -472,6 +476,8 @@ void HashPartitioner::Generate (HashPartitioner& h_first) {
                     size_t off = (offset[partition])++;
                     partitioned_data[partition][off] = key;
                     */
+                //fprintf(stderr,"first bit is %d\n",first_bit);
+                //fprintf(stderr,"key %d goes to partition %d, mask:%x\n",key,partition,parts_mask);
                 size_t off = (offset[partition])++;
 
                 if (histogram == NULL && off == cur_size[partition]) {
@@ -510,6 +516,7 @@ void HashPartitioner::Generate (HashPartitioner& h_first) {
     }
 
         //first_bit = fb;
+    //partitionTimer.Pause();
 }
 
 size_t HashPartitioner::GetHist (uint32_t i) {
@@ -625,9 +632,9 @@ int HashJoin::Close () {
 int HashJoin::Next (std::vector<uint64_t*>* output) {
     if (!init) {
         /*first next materializes input partitions*/
+        
         hR1->Generate (right);
         hR2->Generate (*hR1);
-
         hS1->Generate (left);
         hS2->Generate (*hS1);
         
@@ -639,6 +646,7 @@ int HashJoin::Next (std::vector<uint64_t*>* output) {
         init = true;
     }
 
+    //hashJoinTimer.Start();
     output->clear();
     output->reserve(cleft + cright);
     for (unsigned j = 0; j < cleft + cright; j++)
@@ -652,6 +660,7 @@ int HashJoin::Next (std::vector<uint64_t*>* output) {
     for (uint64_t i = offset_; i < end_; i++)  {
         uint64_t** ptr1 = hR2->GetPartition(last_part);
         uint64_t** ptr2 = hS2->GetPartition(last_part);
+        
         uint64_t idx = dataIn_[i];
 
         for (uint32_t j = 0; j < cright; j++)
@@ -666,6 +675,7 @@ int HashJoin::Next (std::vector<uint64_t*>* output) {
                         so continue probing from next element
                         also outstanding matches from this element should be copied to results (offset_)*/
                         offset_ = i + 1;
+//    hashJoinTimer.Pause();
                         return cnt;
         }
     }
@@ -698,7 +708,7 @@ int HashJoin::Next (std::vector<uint64_t*>* output) {
         /*probe hash table from where we left*/
         for (uint64_t i = last_probe + 1; i < hS2->GetHist(p); i++) {
             dataIn_.clear();
-            end_ = ht->SearchKey(ptr2[jleft][i], 0, this->dataIn_);
+            end_ = ht->SearchKey(ptr2[jleft][i], ptr2[jleft][i] & mask, this->dataIn_);
             if (end_ > 0) {
 
                 /*dataIn_ caches matches in case of multiple hits in hashtable*/
@@ -723,6 +733,7 @@ int HashJoin::Next (std::vector<uint64_t*>* output) {
 
                         last_probe = i;
                         offset_ = k + 1;
+    //hashJoinTimer.Pause();
                         return cnt;
                     }
                 }
@@ -738,7 +749,7 @@ int HashJoin::Next (std::vector<uint64_t*>* output) {
     }
     offset_ = 0;
     end_ = 0;
-
+    //hashJoinTimer.Pause();
     return cnt;
 }
 
