@@ -12,14 +12,14 @@ const unsigned int kAllocInit = 10000;  // Initial allocator capacity
 // Array-based hash table
 // Initialised with number of buckets
 // Example use:
-// HashTable<int> ht(size);
+// ArrayHashTable<int> ht(size);
 // ht.insert(key,value,key%size);
 // value = ht.SearchKey(key,key%size);
 template <typename E>
-class HashTable
+class ArrayHashTable
 {
 public:
-	HashTable(const size_t s)
+	ArrayHashTable(const size_t s)
 	{
 		size_ = s;
 		buckets_ = (uint64_t*) malloc(size_*sizeof(uint64_t));
@@ -31,7 +31,7 @@ public:
 		allocator_ = (HashEntry*) malloc(allocator_capacity_*sizeof(HashEntry));
 	};
 	
-	~HashTable() 
+	~ArrayHashTable() 
 	{ 
 		free (allocator_);
 		free (buckets_);
@@ -132,7 +132,7 @@ private:
 	uint64_t AllocateEntry () {
 		if (allocator_size_ >= allocator_capacity_) {
 			allocator_capacity_ *= 2;
-			//std::cerr<<"HashTable inside AllocateEntry"<<std::endl;
+			//std::cerr<<"ArrayHashTable inside AllocateEntry"<<std::endl;
 			//if(allocator_size_ > 1000000){
 			//	std::cerr<<"pano apo myrio"<<std::endl;
 			//}
@@ -151,5 +151,8 @@ private:
 	uint64_t *buckets_;	// Heads of hash entry lists (offsets of allocator_ array)
 };
 
+
+template<typename E>
+using HashTable = ArrayHashTable<E>;
 
 #endif

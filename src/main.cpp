@@ -4,6 +4,7 @@
 #include <omp.h>
 #include <thread>
 #ifndef OUTPUT 
+    #include "include/ConsiseHashTable.hpp"
     #include "include/Threadpool.hpp"
     #include "include/Database.h"
     #include "include/Relation.h"
@@ -11,6 +12,7 @@
     #include "include/Timer.hpp"
     #include "include/Joiner.h"
 #else
+    #include "ConsiseHashTable.hpp"
     #include "Threadpool.hpp"
     #include "Database.h"
     #include "Relation.h"

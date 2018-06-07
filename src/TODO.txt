@@ -4,8 +4,8 @@ parallel CheckSum::Next
 CHT
 
 
+
 ------------------PENDING-----------------
-All ProjectionPass is buggy (parameter should be ReColMap instead of ReColMap*)
 
 
 
@@ -14,3 +14,4 @@ DONE. add class Database
 DONE. add Catalog into relation
 DONE. simple HashTable
 DONE. complete Operators
+DONE. All ProjectionPass is buggy (parameter should be ReColMap instead of ReColMap*)

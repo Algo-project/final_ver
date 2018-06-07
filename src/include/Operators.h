@@ -13,6 +13,7 @@
 #include "HashTable.hpp"
 #include "parser.h"
 #include "Timer.hpp"
+#include "ConsiseHashTable.hpp"
 
 //#define USE_SYNCHRONIZATION
 

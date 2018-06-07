@@ -4,7 +4,7 @@ SET(DATABASE_SOURCE
             Database.h Database.cpp
             Relation.h Relation.cpp
             Operators.h Operators.cpp         
-            HashTable.hpp
+            HashTable.hpp ConsiseHashTable.hpp
             Joiner.h Joiner.cpp
             Timer.hpp
     )
