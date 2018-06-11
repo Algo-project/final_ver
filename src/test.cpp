@@ -4,8 +4,10 @@
 #include <string>
 
 #ifndef OUTPUT
+#include "include/ConsiseHashTable.hpp"
 #include "include/Threadpool.hpp"
 #else
+#include "ConsiseHashTable.hpp"
 #include "Threadpool.hpp"
 #endif
 
@@ -38,46 +40,31 @@ void doA(A &a, int m)
     a.hello2(m);
 }
 
+
+uint64_t hashFunc(uint64_t key)
+{
+    return key%37;
+}
 int main(int argc, char * argv[])
 {
-    if (argc!=2)
+    CHT<uint64_t> hashtable(128);
+    for(int i=0;i<120;i++)
     {
-        std::cerr<<"Usage: ./test <nthreads>"<<std::endl;
-        return -1;
+        int ii= i%40;
+        hashtable.Insert(ii,hashFunc(ii),i);
     }
-    int nn = atoi(argv[1]);
-    Aposta::FixedThreadPool pool(nn);
-
-    /* the example for upload-and-forget tasks */
-
-    std::random_device r;
-    std::default_random_engine e(r());
-    std::uniform_int_distribution<int> uni(1,3);
-
-    for(int i=0;i<nn*2;i++)
-        pool.enqueue(sleep_job,i,uni(e));
-
-    /* the example for FixedThreadPool::barrier */
-    /* comment the next line of code to see what happens */
-    pool.barrier();
-    printf("main function across the barrier!\n");
-
-
-    /* the example for getting the result of the tasks */
-    std::vector<std::future<size_t>> results;
-    for(int i=0;i<nn;i++)
+    hashtable.TriggerBuild();
+    std::vector<uint64_t> ans;
+    for(int i=0;i<40;i++)
     {
-        results.emplace_back(
-            pool.enqueue(consume_some_cpu,i,MAXN/nn)
-        );
+        hashtable.SearchKey(i,hashFunc(i),ans);
+        std::cout<<"Searching key "<<i<<" : ";
+        for(auto ent : ans)
+        {
+            std::cout<<(int64_t)ent<<" ";
+        }
+        std::cout<<std::endl;
+        ans.clear();
     }
-
-    for(auto && result : results)
-        std::cout<< result.get() << " ";
-    std::cout<<std::endl;
-    pool.barrier();
-
-    /* the example when it comes to object's methods */
-    return 0;
 
 }

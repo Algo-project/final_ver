@@ -1,6 +1,7 @@
 MAKE_JOINER=ON
 MAKE_TEST=ON
 BUILD_TYPE=Release
+#BUILD_TYPE=Debug
 
 mkdir -p build
 cd build

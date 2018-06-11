@@ -695,9 +695,12 @@ int HashJoin::Next (std::vector<uint64_t*>* output) {
             /*sumR2 += hR2->GetHist(p);
             sumS2 += hS2->GetHist(p);*/
 
-            rebuild = false;
             for (uint64_t i = 0; i < hR2->GetHist(p); i++)
                 ht->Insert(ptr1[jright][i], ptr1[jright][i] & mask, i);
+#if USING == _CHT
+            ht->TriggerBuild();
+#endif
+            rebuild = false;
         }
 
  

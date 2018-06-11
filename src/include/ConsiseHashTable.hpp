@@ -1,11 +1,12 @@
 #ifndef _CHT_HPP_
 #define _CHT_HPP_
 
-#include "HashTable.hpp"
+#include <string.h>
 #include <cassert>
 #include <vector>
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 #include <unistd.h>
 /**
  * Helper class for building CHT
@@ -37,7 +38,6 @@ class Bitmap
 		/* return true if it is set */
 		bool At(size_t bkt)
 		{
-			//fprintf(stderr,"testing bkt %ld\n",bkt);
 			auto off = bkt % 32,
 			     ind = bkt / 32;
 			return p[ind] & (1ull << (__getOff(off)));
@@ -47,7 +47,6 @@ class Bitmap
 		bool Set(size_t bkt)
 		{
 			if(At(bkt)) return false;
-			//fprintf(stderr,"seting bkt %ld\n",bkt);
 			auto off = bkt % 32,
 			     ind = bkt / 32;
 			p[ind] |= (1ull <<(__getOff(off)));
@@ -71,7 +70,7 @@ class Bitmap
 
 		size_t GetIndex(size_t bkt)
 		{
-			assert(At(bkt));
+            if(!At(bkt)) return -1;
 			auto off = bkt % 32,
 			     ind = bkt / 32;
 			auto prefix = p[ind] & 0xffffffff;
@@ -85,7 +84,7 @@ class Bitmap
         void Clear()
         {
             this->total = 0;
-            memset(p,0,this->s);
+            memset(p,0,this->getArraySize()*sizeof(p[0]));
         }
 
 		~Bitmap()
@@ -101,69 +100,86 @@ class CHT
     private:
         static const int THRESHOLD = 2;
     public:
-        CHT(size_t size):size_(size),bitmap(size)
+        CHT(size_t size):size_(size),bitmap(size*8),tempCount(0)
         {
             array = new _Entry[size];
+            tempArray = new _Entry[size];
         }
         ~CHT()
         {
-            delete[] array;
+            delete[] this->array;
+            delete[] this->tempArray;
         }
 
         size_t getSize(){return this->size_;}
+        
 
-        template<class UnaryOp>
-        void Build(std::vector<E> &keyArr, std::vector<uint64_t> &valArr,
-                const UnaryOp &transfer)
+        int Insert(const E key, const uint64_t hashv, const uint64_t value)
         {
-            for(int i=0;i<keyArr.size();i++)
+            if(tempCount >= this->size_) //realloc
             {
-                auto key = keyArr[i];
-                uint64_t val = valArr[i];
-                auto hashv = transfer(key);
-                for(int j=0;j<THRESHOLD;j++)
-                    if(this->bitmap.Set(j+hashv)) break;
+                tempArray = (_Entry*)reallocarray(tempArray, 2*this->size_, sizeof(_Entry));
+                array = (_Entry*)reallocarray(array,2*this->size_, sizeof(_Entry));
+                this->size_ *= 2;
             }
-            this->bitmap.FillPrefix();
 
-            bool *isset = (bool*)calloc(this->size_, sizeof(bool));
-            for(int i=0;i<keyArr.size();i++)
+            tempArray[tempCount++] = {key,value,hashv};
+            bool flag = false;
+            for(int i=0;i<THRESHOLD;i++)
             {
-                _Entry _kvp{keyArr[i],valArr[i]};
-                auto hashv = transfer(_kvp.key);
-                bool isIntoOverflow = true;
-                for(int j=0;j<THRESHOLD;j++)
+                auto posi = i+hashv;
+                if(posi >= size_) break;
+                flag = bitmap.Set(posi);
+                if(flag) {
+                    break;
+                }
+            }
+            if(!flag){ 
+                overflow.emplace(key,value);
+            }
+            return 0;
+        }
+
+        int TriggerBuild()
+        {
+            this->bitmap.FillPrefix();
+            bool isset[size_];// = (bool*)calloc(size_,sizeof(bool));
+            memset(isset, 0, size_*sizeof(bool));
+            for(int i=0;i<tempCount;i++)
+            {
+                int hv = tempArray[i].hashv;
+                for(int j=hv;j<hv+THRESHOLD && j<size_;j++)
                 {
-                    uint64_t index = 0;
-//                    if(this->bitmap.At(hashv + j))
-                        index = this->bitmap.GetIndex(hashv + j);
-//                    else break;
-                    if(!isset[index]) /* insert into array */
+                    ssize_t pos = this->bitmap.GetIndex(j);
+                    if(pos == -1) break;
+                    if(!isset[pos])
                     {
-                        isIntoOverflow = false;
-                        array[index] = _kvp;
-                        isset[index] = true;
+                        this->array[pos] = tempArray[i];
+                        isset[pos] = true;
                         break;
                     }
                 }
-                if(isIntoOverflow)
-                    overflow.insert({keyArr[i],valArr[i]});
             }
-
-            delete[] isset;
+            //free(isset);
+            
+            return 0;
         }
+
 
         int SearchKey(const E key, const uint64_t hashv, 
                std::vector<uint64_t> &result)
         {
             int beforeSize = result.size();
             for(size_t i=hashv;i<hashv+THRESHOLD;i++)
-                if(this->bitmap.At(i))
+            {
+                if(i>=size_) break;
+                ssize_t pos = this->bitmap.GetIndex(i);
+                if(pos!=-1)
                 {
-                    auto pos = this->bitmap.GetIndex(i);
                     auto ent = array[pos];
                     if(ent.key == key) result.push_back(ent.value);
                 }
+            }
 
             auto range = overflow.equal_range(key);
             for(auto it = range.first;it!=range.second;it++)
@@ -176,22 +192,34 @@ class CHT
         {
             bitmap.Clear();
             overflow.clear();
+            tempCount = 0;
         }
     private:
         struct _Entry
         {
-            uint64_t key;
+            E key;
             uint64_t value;
+            uint64_t hashv;
             bool operator==(const _Entry &e) const{return this->key == e.key;}
+        };
+        struct _Hash
+        {
+            std::hash<E> _h;
+            size_t operator()(const _Entry &ent) const noexcept
+            {
+                return _h(ent.key);
+            }
         };
         uint64_t size_;
         Bitmap bitmap;
         _Entry *array;
-        std::unordered_multimap<E, uint64_t> overflow;
+        _Entry *tempArray;
+        uint64_t tempCount;
+        //std::vector<_Entry> array;
+        //std::vector<_Entry> tempArray;
+        std::unordered_multimap<E,uint64_t> overflow;
         
 };
 
 
-//template<typename E>
-//using HashTable = CHT<E>;
 #endif

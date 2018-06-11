@@ -21,6 +21,8 @@
     #include "Joiner.h"
 #endif
 
+//#define USE_MULTITHREAD
+
 Util::Timer hashJoinTimer;
 Util::Timer hashTableTimer;
 Util::Timer checkSumTimer;
@@ -80,14 +82,19 @@ int main(int argc,char *argv[])
     {
         if(line=="F")
         {
+#ifdef USE_MULTITHREAD
             for(auto &&fut : results)
                 std::cout<<fut.get()<<std::endl;
             results.clear();
+#endif
             continue;
         }
+#ifdef USE_MULTITHREAD 
         auto fut = pool->enqueue(doJob,line,&db);
         results.push_back(std::move(fut));
-//        std::cout<<doJob(line,&db)<<std::endl;
+#else 
+        std::cout<<doJob(line,&db)<<std::endl;
+#endif
     }
 
     std::cout<<"Partition Time: "<<partitionTimer.GetTime()<<" "<<partitionTimer.GetStartCount()<<std::endl;

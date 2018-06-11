@@ -1,53 +1,25 @@
-#ifndef _HASHTABLE_HPP_
-#define _HASHTABLE_HPP_
+#ifndef ARRAYHASH_TABLE_H
+#define ARRAYHASH_TABLE_H
 
-#include <unordered_map>
-#include <map>
-#include <algorithm>
+#include <iostream>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <vector>
-#include <string.h>
-#include "Timer.hpp"
 
+const unsigned int kAllocInit = 10000;  // Initial allocator capacity
 
-/* A simple hashtable based on std::unordered_multimap */
-
-extern Util::Timer hashTableTimer;
-template<typename E>
-class SimpleHashTable
-{
-    public:
-        SimpleHashTable(size_t s){};
-        ~SimpleHashTable() = default;
-
-        size_t GetSize()const {return table_.size();}
-        void Insert(const uint64_t key, const uint64_t hashv, const uint64_t v)
-        {
-            table_.insert({key,v});
-        }
-        int SearchKey(const uint64_t key, const uint64_t hashv, std::vector<uint64_t> &result) const
-        {
-            auto pair = table_.equal_range(key);
-            std::transform(pair.first, pair.second, std::back_inserter(result),
-                    [](auto it){return it.second;});
-            return std::distance(pair.first, pair.second);
-        }
-        void Erase(){
-            table_.clear();
-        }
-    private:
-        std::multimap<E,uint64_t> table_;
-
-};
-
-
-
-/* HashTable Definition */
-/*const unsigned int kAllocInit = 10000;  // Initial allocator capacity
+// Array-based hash table
+// Initialised with number of buckets
+// Example use:
+// ArrayHashTable<int> ht(size);
+// ht.insert(key,value,key%size);
+// value = ht.SearchKey(key,key%size);
 template <typename E>
-class HashTable
+class ArrayHashTable
 {
 public:
-	HashTable(const size_t s)
+	ArrayHashTable(const size_t s)
 	{
 		size_ = s;
 		buckets_ = (uint64_t*) malloc(size_*sizeof(uint64_t));
@@ -59,7 +31,7 @@ public:
 		allocator_ = (HashEntry*) malloc(allocator_capacity_*sizeof(HashEntry));
 	};
 	
-	~HashTable() 
+	~ArrayHashTable() 
 	{ 
 		free (allocator_);
 		free (buckets_);
@@ -71,12 +43,14 @@ public:
 	
 	void Insert(const uint64_t key,const uint64_t hash_value, const uint64_t value) 
 	{
+        //fprintf(stderr,"Insert {%d, %zu, %zu}\n ",key,value,hash_value);
 		uint64_t offset = AllocateEntry();
 		allocator_[offset].key = key;
 		allocator_[offset].next = buckets_[hash_value];
 		allocator_[offset].value = value;
 
 		buckets_[hash_value] = offset;
+        //fprintf(stderr,"size : %zu\n", this->allocator_size_);
 	};
 	
 	// Return value associated with key + its hash value else NULL
@@ -113,6 +87,8 @@ public:
 	
 		//std::cout << cnt << std::endl;
 		//std::cerr<<"Cnt:"<<cnt<< "RBFS: "<<result_buffer.size()<<"lol_counter:"<<lol_counter<<std::endl;
+        //fprintf(stderr,"search key {%d, %zu}, found total %zu items\n",
+        //           key, hash_value, cnt); 
 		return cnt; 
 	}
 	bool InsertNoDup(const uint64_t key,const uint64_t hash_value, const uint32_t value) 
@@ -159,7 +135,7 @@ private:
 	uint64_t AllocateEntry () {
 		if (allocator_size_ >= allocator_capacity_) {
 			allocator_capacity_ *= 2;
-			//std::cerr<<"HashTable inside AllocateEntry"<<std::endl;
+			//std::cerr<<"ArrayHashTable inside AllocateEntry"<<std::endl;
 			//if(allocator_size_ > 1000000){
 			//	std::cerr<<"pano apo myrio"<<std::endl;
 			//}
@@ -176,8 +152,8 @@ private:
 
 	size_t size_;
 	uint64_t *buckets_;	// Heads of hash entry lists (offsets of allocator_ array)
-};*/
-template<typename E>
-using HashTable = SimpleHashTable<E>;
+};
+
+
 
 #endif
