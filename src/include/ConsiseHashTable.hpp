@@ -75,7 +75,7 @@ class Bitmap
 			     ind = bkt / 32;
 			auto prefix = p[ind] & 0xffffffff;
 			auto aa = p[ind] >> 32;
-			auto mask = ~(-1<<bkt);
+			auto mask = ~(-1<<off);
 			aa &= mask;
 			auto append = __builtin_popcountll(aa);
 			return prefix + append;
