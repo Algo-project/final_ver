@@ -1,4 +1,10 @@
 #ignore build folder
 build/
 bin/
-*.swp  #vim temporary files
+
+#swap
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
