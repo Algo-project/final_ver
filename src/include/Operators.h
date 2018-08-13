@@ -10,6 +10,7 @@
 
 #include "Relation.h"
 #include "Threadpool.hpp"
+#include "HashTableCfg.hpp"
 #include "HashTable.hpp"
 #include "parser.h"
 #include "Timer.hpp"

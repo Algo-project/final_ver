@@ -590,7 +590,7 @@ int HashJoin::Open () {
     for (unsigned j = 0; j < cleft + cright; j++)
         it[j] = new uint64_t[VECTOR_SIZE];
 
-    ht = new HashTable<int>(htSize);
+    ht = new HashTable_<int>(htSize);
             
     hR1 = new HashPartitioner (log_parts1, cright, jright, histogramR1, first_bit + log_parts2);
     hR2 = new HashPartitioner (log_parts1 + log_parts2, cright, jright, histogramR2, first_bit);

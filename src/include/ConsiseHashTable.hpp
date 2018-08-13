@@ -8,6 +8,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <unistd.h>
+
+#include "HashTable.hpp"
+
 /**
  * Helper class for building CHT
  */
@@ -30,13 +33,13 @@ class Bitmap
 
 		size_t getArraySize(){return s/32+1;}
 
-		size_t __getOff(size_t off)	{return off+32;}
+		size_t __getOff(size_t off)const{return off+32;}
 
 	public:
 		Bitmap(size_t size)	{__set(size);}
 
 		/* return true if it is set */
-		bool At(size_t bkt)
+		bool At(size_t bkt) const
 		{
 			auto off = bkt % 32,
 			     ind = bkt / 32;
@@ -68,7 +71,7 @@ class Bitmap
         [[deprecated]]
 		size_t GetTotal(){return total;}
 
-		size_t GetIndex(size_t bkt)
+		size_t GetIndex(size_t bkt) const
 		{
             if(!At(bkt)) return -1;
 			auto off = bkt % 32,
@@ -95,7 +98,7 @@ class Bitmap
 };
 
 template<typename E>
-class CHT
+class CHT : public HashTable<E>
 {
     private:
         static const int THRESHOLD = 2;
@@ -114,12 +117,12 @@ class CHT
         size_t getSize(){return this->size_;}
         
 
-        int Insert(const E key, const uint64_t hashv, const uint64_t value)
+        int Insert(const E key, const uint64_t hashv, const uint64_t value) override
         {
             if(tempCount >= this->size_) //realloc
             {
-                tempArray = (_Entry*)reallocarray(tempArray, 2*this->size_, sizeof(_Entry));
-                array = (_Entry*)reallocarray(array,2*this->size_, sizeof(_Entry));
+                tempArray = (_Entry*)realloc((void*)tempArray, 2*this->size_ * sizeof(_Entry));
+                array = (_Entry*)realloc(array,2*this->size_ * sizeof(_Entry));
                 this->size_ *= 2;
             }
 
@@ -140,7 +143,7 @@ class CHT
             return 0;
         }
 
-        int TriggerBuild()
+        int TriggerBuild() override
         {
             this->bitmap.FillPrefix();
             bool isset[size_];// = (bool*)calloc(size_,sizeof(bool));
@@ -166,8 +169,8 @@ class CHT
         }
 
 
-        int SearchKey(const E key, const uint64_t hashv, 
-               std::vector<uint64_t> &result)
+        uint64_t SearchKey(const E key, const uint64_t hashv, 
+               std::vector<uint64_t> &result) const override
         {
             int beforeSize = result.size();
             for(size_t i=hashv;i<hashv+THRESHOLD;i++)
@@ -188,7 +191,7 @@ class CHT
             return result.size() - beforeSize;
         }
 
-        void Erase()
+        void Erase() override
         {
             bitmap.Clear();
             overflow.clear();

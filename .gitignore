@@ -1,0 +1,4 @@
+#ignore build folder
+build/
+bin/
+*.swp  #vim temporary files
