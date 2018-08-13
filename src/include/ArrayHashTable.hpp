@@ -7,6 +7,8 @@
 #include <cstring>
 #include <vector>
 
+#include "HashTable.hpp"
+
 const unsigned int kAllocInit = 10000;  // Initial allocator capacity
 
 // Array-based hash table
@@ -16,7 +18,7 @@ const unsigned int kAllocInit = 10000;  // Initial allocator capacity
 // ht.insert(key,value,key%size);
 // value = ht.SearchKey(key,key%size);
 template <typename E>
-class ArrayHashTable
+class ArrayHashTable : public HashTable<E>
 {
 public:
 	ArrayHashTable(const size_t s)
@@ -38,10 +40,9 @@ public:
 		buckets_ = NULL;		
 		size_ = 0; 
 	};
+	size_t getSize() { return size_; }
 	
-	size_t get_size() { return size_; }
-	
-	void Insert(const uint64_t key,const uint64_t hash_value, const uint64_t value) 
+	void Insert(const E key,const uint64_t hash_value, const uint64_t value) 
 	{
         //fprintf(stderr,"Insert {%d, %zu, %zu}\n ",key,value,hash_value);
 		uint64_t offset = AllocateEntry();

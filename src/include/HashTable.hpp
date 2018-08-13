@@ -1,25 +1,27 @@
 #ifndef _HASHTABLE_HPP_
 #define _HASHTABLE_HPP_
 
-#include "ConsiseHashTable.hpp"
-#include "ArrayHashTable.hpp"
-#include "StdHashTable.hpp"
+#include <stdlib.h>
+#include <stdint.h>
+#include <vector>
 
-#define _AHT 0
-#define _CHT 1
-#define _STD 2
-#define USING _CHT
+template<typename E>
+class HashTable
+{
+    public:
+        /* You must implement following 4 methods! */
+        virtual size_t getSize() = 0;
+        virtual int Insert(const E key, const uint64_t hashv, const uint64_t value) = 0;
+        virtual uint64_t SearchKey(const E key, const uint64_t hashv, 
+                                    std::vector<uint64_t> &result_buffer) const = 0;
+        virtual void Erase() = 0;
+        virtual ~HashTable(){};
 
-template <typename E>
-#if USING == _CHT
-using HashTable = CHT<E>;
-#elif USING == _AHT
-using HashTable = ArrayHashTable<E>;
-#else 
-using HashTable = SimpleHashTable<E>;
-#endif
-
-    
+    public:
+        /* Some method is declared without implementation */
+        [[deprecated]]
+            virtual int TriggerBuild();     // this is implemented in CHT
+};
 
 
 #endif
