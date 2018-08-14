@@ -3,35 +3,31 @@
 
 #include <stdexcept>
 #include "HashTable.hpp"
-
-
-struct CuckooConfig
-{
-    const int SLOTS_PER_BUCKET = 4;
-};
+#include "libcuckoo/cuckoohash_map.hh"
 
 template<typename K>
-class CuckooBucket 
+class CuckooHashTable : public HashTable<K>
 {
-    private:
-        using key_type = K;
-        using value_type = std::pair<K, uint64_t>;
-        using reference = value_type &;
-        using const_reference = const value_type &;
-        using pointer = value_type*;
-        using const_pointer = const value_type *;
-
+    using E = K;
     public:
-        reference at(const int ind);
-        value_type insert(const_reference kvp);
-        
-        
+        size_t getSize() override { return map.size();} 
+        int Insert(const E key, const uint64_t hashv, const uint64_t value) override
+        {
+        }
+
+        uint64_t SearchKey(const E key, const uint64_t hashv,
+                std::vector<uint64_t> &result) const override
+        {
+            map.find(key);
+        }
+
+        void Erase() override {map.clear();}
 
     private:
-
-
+        cuckoohash_map<K, uint64_t> map;
 };
 
 
+CuckooHashTable<uint64_t> vv;
 
 #endif

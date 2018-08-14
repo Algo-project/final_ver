@@ -3,12 +3,15 @@
 #include <random>
 #include <string>
 
+#include "include/libcuckoo/cuckoohash_map.hh"
 #ifndef OUTPUT
 #include "include/ConsiseHashTable.hpp"
 #include "include/Threadpool.hpp"
+#include "include/CuckooHashTable.hpp"
 #else
 #include "ConsiseHashTable.hpp"
 #include "Threadpool.hpp"
+#include "CuckooHashTable.hpp"
 #endif
 
 #define MAXN 1000000000
@@ -47,24 +50,15 @@ uint64_t hashFunc(uint64_t key)
 }
 int main(int argc, char * argv[])
 {
-    CHT<uint64_t> hashtable(128);
-    for(int i=0;i<120;i++)
+    using Map = cuckoohash_map<uint64_t, uint64_t> ;
+    Map mp;
+    mp.insert(1,2);
+    mp.insert(2,2);
+    mp.insert(1,3);
+    auto v = mp.lock_table().equal_range(2);
+    std::cout<<mp.lock_table().count(1)<<std::endl;
+    for(auto it = v.first; it!=v.second; it++)
     {
-        int ii= i%40;
-        hashtable.Insert(ii,hashFunc(ii),i);
+        std::cout<<it->first<<std::endl;
     }
-    hashtable.TriggerBuild();
-    std::vector<uint64_t> ans;
-    for(int i=0;i<40;i++)
-    {
-        hashtable.SearchKey(i,hashFunc(i),ans);
-        std::cout<<"Searching key "<<i<<" : ";
-        for(auto ent : ans)
-        {
-            std::cout<<(int64_t)ent<<" ";
-        }
-        std::cout<<std::endl;
-        ans.clear();
-    }
-
 }
