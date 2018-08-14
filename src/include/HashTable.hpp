@@ -20,7 +20,7 @@ class HashTable
     public:
         /* Some method is declared without implementation */
         [[deprecated]]
-            virtual int TriggerBuild();     // this is implemented in CHT
+            virtual int TriggerBuild(){return 0;};     // this is implemented in CHT
 };
 
 
