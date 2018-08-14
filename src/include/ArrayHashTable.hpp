@@ -42,7 +42,7 @@ public:
 	};
 	size_t getSize() { return size_; }
 	
-	void Insert(const E key,const uint64_t hash_value, const uint64_t value) 
+	int Insert(const E key,const uint64_t hash_value, const uint64_t value) 
 	{
         //fprintf(stderr,"Insert {%d, %zu, %zu}\n ",key,value,hash_value);
 		uint64_t offset = AllocateEntry();
@@ -52,10 +52,11 @@ public:
 
 		buckets_[hash_value] = offset;
         //fprintf(stderr,"size : %zu\n", this->allocator_size_);
+        return 0;
 	};
 	
 	// Return value associated with key + its hash value else NULL
-	uint64_t SearchKey(const uint64_t key,const uint64_t hash_value, std::vector<uint64_t>& result_buffer) const
+	uint64_t SearchKey(const E key,const uint64_t hash_value, std::vector<uint64_t>& result_buffer) const
 	{
 		//std::cerr<<"Mpika stin SearchKey"<<std::endl;
 		uint64_t cnt = 0;

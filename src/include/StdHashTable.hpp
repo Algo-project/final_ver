@@ -15,18 +15,20 @@
 
 extern Util::Timer hashTableTimer;
 template<typename E>
-class SimpleHashTable : HashTable<E>
+class SimpleHashTable : public HashTable<E>
 {
     public:
         SimpleHashTable(size_t s){};
         ~SimpleHashTable() = default;
 
         size_t getSize()const {return table_.size();}
-        void Insert(const uint64_t key, const uint64_t hashv, const uint64_t v)
+        size_t getSize(){return table_.size();}
+        int Insert(const E key, const uint64_t hashv, const uint64_t v)
         {
             table_.insert({key,v});
+            return 0;
         }
-        int SearchKey(const uint64_t key, const uint64_t hashv, std::vector<uint64_t> &result) const
+        uint64_t SearchKey(const E key, const uint64_t hashv, std::vector<uint64_t> &result) const
         {
             auto pair = table_.equal_range(key);
             std::transform(pair.first, pair.second, std::back_inserter(result),

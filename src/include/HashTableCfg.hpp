@@ -9,7 +9,7 @@
 #define _AHT 0
 #define _CHT 1
 #define _STD 2
-#define USING _CHT
+#define USING _STD
 
 template <typename E>
 #if USING == _CHT
