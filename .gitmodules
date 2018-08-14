@@ -1,0 +1,3 @@
+[submodule "src/third_party/libcuckoo"]
+	path = src/third_party/libcuckoo
+	url = https://github.com/efficient/libcuckoo
